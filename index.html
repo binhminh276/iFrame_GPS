@@ -1,130 +1,113 @@
 <!DOCTYPE html>
 <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bản đồ Google với E-Ra Services</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bản đồ Google với E-Ra Services</title>
 
-    <!-- Tải Google Maps API -->
-    <script
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDByjical2bG4Q5uH6SqsGk-4dEmjWSxkM"
-      async
-      defer
-    ></script>
-    <!-- Tải thư viện E-Ra Widget -->
-  </head>
-  <body>
-    <!-- Vùng chứa bản đồ -->
-    <div id="map"></div>
-    <script src="https://www.unpkg.com/@eohjsc/era-widget@1.1.3/src/index.js"></script>
+  <!-- Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOURAPI&callback=initMap" async defer></script>
+
+  <!-- E-Ra Widget -->
+  <script src="https://www.unpkg.com/@eohjsc/era-widget@1.1.3/src/index.js"></script>
+
+  <style>
+    #map {
+      height: 700px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Map Container -->
+<div id="map"></div>
+
 <script>
-  let map;
-  let marker;
-  let currentPath;
-  let currentColor;
-  let pathCoordinates = [];
-  let lastPosition = null;
-
-  let LAT = 0;
-  let LON = 0;
-  let SPEED = 0;
-  let BUTTON = 1; // Bật vẽ đường mặc định
+  const eraWidget = new EraWidget();
 
   let configLAT = null;
   let configLON = null;
   let configBUTTON = null;
   let configSPEED = null;
 
-  // Khởi tạo E-Ra Widget
-  const eraWidget = new EraWidget();
+  let LAT = 0, LON = 0, SPEED = 0, BUTTON = 0;
+  let lastPosition = null;
+  let map, marker, currentPath, currentColor, pathCoordinates = [];
+  let updateInterval;
 
-  window.onload = function () {
+  window.onload = () => {
     initMap();
-    eraWidget.init({
-      onConfiguration: (configuration) => {
-        configLAT = configuration.realtime_configs[0];
-        configLON = configuration.realtime_configs[1];
-        configBUTTON = configuration.realtime_configs[2];
-        configSPEED = configuration.realtime_configs[3];
-      },
-      onValues: (values) => {
-        if (configLAT && values[configLAT.id]) {
-          LAT = values[configLAT.id].value;
-          console.log("LAT:", LAT);
-        }
-        if (configLON && values[configLON.id]) {
-          LON = values[configLON.id].value;
-          console.log("LON:", LON);
-        }
-        if (configBUTTON && values[configBUTTON.id]) {
-          BUTTON = values[configBUTTON.id].value;
-          console.log("BUTTON:", BUTTON);
-        }
-        if (configSPEED && values[configSPEED.id]) {
-          SPEED = values[configSPEED.id].value;
-          console.log("SPEED:", SPEED);
-        }
-
-        // Sau khi nhận xong dữ liệu — cập nhật bản đồ
-        updateMapCenter();
-      }
-    });
   };
 
-  function initMap() {
-    // Khởi tạo bản đồ với vị trí mặc định TP.HCM
-    const defaultLat = 10.762622;
-    const defaultLon = 106.660172;
+  eraWidget.init({
+    onConfiguration: (configuration) => {
+      configLAT = configuration.realtime_configs[0];
+      configLON = configuration.realtime_configs[1];
+      configBUTTON = configuration.realtime_configs[2];
+      configSPEED = configuration.realtime_configs[3];
+    },
+    onValues: (values) => {
+      if (configLAT && values[configLAT.id]) LAT = values[configLAT.id].value;
+      if (configLON && values[configLON.id]) LON = values[configLON.id].value;
+      if (configBUTTON && values[configBUTTON.id]) BUTTON = values[configBUTTON.id].value;
+      if (configSPEED && values[configSPEED.id]) SPEED = values[configSPEED.id].value;
+    }
+  });
 
-    const options = {
+  function initMap() {
+    const defaultLat = 10.851055;
+    const defaultLon = 106.771848;
+
+    map = new google.maps.Map(document.getElementById('map'), {
       zoom: 14,
       center: { lat: defaultLat, lng: defaultLon }
-    };
-
-    map = new google.maps.Map(document.getElementById("map"), options);
+    });
 
     marker = new google.maps.Marker({
       position: { lat: defaultLat, lng: defaultLon },
-      map: map,
+      map: map
     });
 
     lastPosition = { lat: defaultLat, lng: defaultLon };
+    updateInterval = setInterval(updateMapCenter, 1000);
   }
 
   function updateMapCenter() {
-    if (!map || !marker) return;
+    if (LAT && LON) {
+      const isValidLat = LAT >= -90 && LAT <= 90;
+      const isValidLon = LON >= -180 && LON <= 180;
 
-    const isValidLat = typeof LAT === 'number' && !isNaN(LAT) && LAT >= -90 && LAT <= 90;
-    const isValidLon = typeof LON === 'number' && !isNaN(LON) && LON >= -180 && LON <= 180;
-
-    if (!isValidLat || !isValidLon) {
-      console.warn("Invalid location received. Keeping last position.");
-      marker.setPosition(lastPosition);
-      map.setCenter(lastPosition);
-      return;
-    }
-
-    const newPosition = { lat: parseFloat(LAT), lng: parseFloat(LON) };
-    marker.setPosition(newPosition);
-    map.setCenter(newPosition);
-
-    if (BUTTON === 1) {
-      const strokeColor = getRainbowColorForSpeed(SPEED);
-
-      if (!currentPath || strokeColor !== currentColor) {
-        if (pathCoordinates.length > 0 && currentPath) {
-          currentPath.setPath(pathCoordinates);
-        }
-        pathCoordinates = lastPosition ? [lastPosition] : [];
-        currentColor = strokeColor;
-        initializePath(strokeColor);
+      if (!isValidLat || !isValidLon) {
+        console.warn("Invalid location received.");
+        return;
       }
 
-      pathCoordinates.push(newPosition);
-      currentPath.setPath(pathCoordinates);
-    }
+      const newPos = { lat: parseFloat(LAT), lng: parseFloat(LON) };
 
-    lastPosition = newPosition;
+      map.setCenter(newPos);
+      marker.setPosition(newPos);
+
+      if (BUTTON === 1) {
+        const strokeColor = getRainbowColorForSpeed(SPEED);
+
+        if (!currentPath || strokeColor !== currentColor) {
+          if (pathCoordinates.length > 0) {
+            currentPath.setPath(pathCoordinates);
+          }
+          pathCoordinates = lastPosition ? [lastPosition] : [];
+          currentColor = strokeColor;
+          initializePath(strokeColor);
+        }
+
+        pathCoordinates.push(newPos);
+        currentPath.setPath(pathCoordinates);
+        lastPosition = newPos;
+      } else {
+        if (currentPath) currentPath.setPath(pathCoordinates);
+        lastPosition = null;
+      }
+    }
   }
 
   function initializePath(strokeColor) {
@@ -133,7 +116,7 @@
       geodesic: true,
       strokeColor: strokeColor,
       strokeOpacity: 1.0,
-      strokeWeight: 4,
+      strokeWeight: 4
     });
     currentPath.setMap(map);
   }
@@ -142,48 +125,29 @@
     return [
       Math.round(color1[0] + factor * (color2[0] - color1[0])),
       Math.round(color1[1] + factor * (color2[1] - color1[1])),
-      Math.round(color1[2] + factor * (color2[2] - color1[2])),
+      Math.round(color1[2] + factor * (color2[2] - color1[2]))
     ];
   }
 
   function getRainbowColorForSpeed(speed) {
     const colors = [
-      [255, 0, 0],    // Đỏ
-      [255, 165, 0],  // Cam
-      [255, 255, 0],  // Vàng
-      [0, 255, 0],    // Xanh lá
-      [0, 0, 255],    // Xanh dương
-      [75, 0, 130],   // Chàm
-      [238, 130, 238] // Tím
+      [255, 0, 0], [255, 165, 0], [255, 255, 0],
+      [0, 255, 0], [0, 0, 255], [75, 0, 130], [238, 130, 238]
     ];
 
-    const numColors = colors.length;
     const maxSpeed = 100;
+    const numColors = colors.length;
     const segment = maxSpeed / (numColors - 1);
 
     let startColorIndex = Math.floor(speed / segment);
-    let endColorIndex = startColorIndex + 1;
-
-    if (endColorIndex >= numColors) {
-      endColorIndex = numColors - 1;
-    }
+    let endColorIndex = Math.min(startColorIndex + 1, numColors - 1);
 
     const factor = (speed % segment) / segment;
-    const [r, g, b] = interpolateColor(
-      colors[startColorIndex],
-      colors[endColorIndex],
-      factor
-    );
+    const [r, g, b] = interpolateColor(colors[startColorIndex], colors[endColorIndex], factor);
 
     return `rgb(${r}, ${g}, ${b})`;
   }
 </script>
 
-    <style>
-      #map {
-        height: 700px;
-        width: 100%;
-      }
-    </style>
-  </body>
+</body>
 </html>
