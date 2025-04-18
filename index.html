@@ -36,9 +36,9 @@
   let map, marker, currentPath, currentColor, pathCoordinates = [];
   let updateInterval;
 
-  window.onload = () => {
-    initMap();
-  };
+  window.onload = function() {
+        initMap(); // Initialize the map on page load
+    }
 
   eraWidget.init({
     onConfiguration: (configuration) => {
@@ -48,29 +48,41 @@
       configSPEED = configuration.realtime_configs[3];
     },
     onValues: (values) => {
-      if (configLAT && values[configLAT.id]) LAT = values[configLAT.id].value;
-      if (configLON && values[configLON.id]) LON = values[configLON.id].value;
-      if (configBUTTON && values[configBUTTON.id]) BUTTON = values[configBUTTON.id].value;
-      if (configSPEED && values[configSPEED.id]) SPEED = values[configSPEED.id].value;
-    }
+            // To get value of sensor
+            if (configLAT && values[configLAT.id]) {
+                LAT = values[configLAT.id].value;
+                console.log("Value LAT:", LAT);
+            }
+            if (configLON && values[configLON.id]) {
+                LON = values[configLON.id].value;
+                console.log("Value LON:", LON);
+            }
+            if (configBUTTON && values[configBUTTON.id]) {
+                BUTTON = values[configBUTTON.id].value;
+                console.log("Value BUTTON:", BUTTON);
+            }
+            if (configSPEED && values[configSPEED.id]) {
+                SPEED = values[configSPEED.id].value;
+                console.log("Value SPEED:", SPEED);
+            }
+        },
   });
 
+
   function initMap() {
-    const defaultLat = 10.851055;
-    const defaultLon = 106.771848;
+    const options = {
+            zoom: 14,
+            center: { lat: LAT, lng: LON }
+        };
 
-    map = new google.maps.Map(document.getElementById('map'), {
-      zoom: 14,
-      center: { lat: defaultLat, lng: defaultLon }
-    });
+        map = new google.maps.Map(document.getElementById('map'), options);
 
-    marker = new google.maps.Marker({
-      position: { lat: defaultLat, lng: defaultLon },
-      map: map
-    });
+        marker = new google.maps.Marker({
+            position: { lat: LAT, lng: LON },
+            map: map
+        });
 
-    lastPosition = { lat: defaultLat, lng: defaultLon };
-    updateInterval = setInterval(updateMapCenter, 1000);
+        updateInterval = setInterval(updateMapCenter, 1000);
   }
 
   function updateMapCenter() {
