@@ -86,40 +86,35 @@
   }
 
   function updateMapCenter() {
-    if (LAT && LON) {
-      const isValidLat = LAT >= -90 && LAT <= 90;
-      const isValidLon = LON >= -180 && LON <= 180;
+     if (LAT && LON) {
+            const newCenter = { lat: parseFloat(LAT), lng: parseFloat(LON) };
 
-      if (!isValidLat || !isValidLon) {
-        console.warn("Invalid location received.");
-        return;
-      }
+            map.setCenter(newCenter);
+            marker.setPosition(newCenter);
 
-      const newPos = { lat: parseFloat(LAT), lng: parseFloat(LON) };
+            if (BUTTON === 1) {
+                const strokeColor = getRainbowColorForSpeed(SPEED);
 
-      map.setCenter(newPos);
-      marker.setPosition(newPos);
+                if (!currentPath || strokeColor !== currentColor) {
+                    if (pathCoordinates.length > 0) {
+                        currentPath.setPath(pathCoordinates); 
+                    }
+                    pathCoordinates = lastPosition ? [lastPosition] : [];
+                    currentColor = strokeColor;
+                    initializePath(strokeColor);
+                }
 
-      if (BUTTON === 1) {
-        const strokeColor = getRainbowColorForSpeed(SPEED);
-
-        if (!currentPath || strokeColor !== currentColor) {
-          if (pathCoordinates.length > 0) {
-            currentPath.setPath(pathCoordinates);
-          }
-          pathCoordinates = lastPosition ? [lastPosition] : [];
-          currentColor = strokeColor;
-          initializePath(strokeColor);
+                pathCoordinates.push(newCenter);
+                currentPath.setPath(pathCoordinates); 
+                
+                lastPosition = newCenter;
+            } else {
+                if (currentPath) {
+                    currentPath.setPath(pathCoordinates);
+                }
+                lastPosition = null; 
+            }
         }
-
-        pathCoordinates.push(newPos);
-        currentPath.setPath(pathCoordinates);
-        lastPosition = newPos;
-      } else {
-        if (currentPath) currentPath.setPath(pathCoordinates);
-        lastPosition = null;
-      }
-    }
   }
 
   function initializePath(strokeColor) {
